@@ -197,17 +197,17 @@ impl Tracer {
                 if new <= 0 {
                     return;
                 }
-                if event == libc::PTRACE_EVENT_CLONE {
-                    if let Some(tgid) = tgid_of(new).filter(|&g| g != new) {
-                        self.threads.insert(new, tgid);
-                        if !self.early_stop.remove(&new) {
-                            self.expect_stop.insert(new);
-                        }
-                        return;
-                    }
-                }
                 let owner =
                     if self.procs.contains_key(&pid) { pid } else { self.threads.get(&pid).copied().unwrap_or(pid) };
+                // clone() makes threads as well as processes: a new thread is
+                // listed in its creator's task directory (one stat, no parsing).
+                if event == libc::PTRACE_EVENT_CLONE && std::fs::metadata(format!("/proc/{owner}/task/{new}")).is_ok() {
+                    self.threads.insert(new, owner);
+                    if !self.early_stop.remove(&new) {
+                        self.expect_stop.insert(new);
+                    }
+                    return;
+                }
                 let parent = self.procs.get(&owner).copied();
                 let id = self.spans.len() as u32;
                 let mut s = match parent {
@@ -275,11 +275,6 @@ fn is_group_stop(pid: i32) -> bool {
         libc::ptrace(libc::PTRACE_GETSIGINFO, pid, 0usize, &mut si as *mut libc::siginfo_t) == -1
             && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINVAL)
     }
-}
-
-fn tgid_of(tid: i32) -> Option<i32> {
-    let status = std::fs::read_to_string(format!("/proc/{tid}/status")).ok()?;
-    status.lines().find_map(|l| l.strip_prefix("Tgid:")).and_then(|v| v.trim().parse().ok())
 }
 
 fn read_cmdline(pid: i32) -> Option<Vec<String>> {
