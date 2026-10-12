@@ -341,7 +341,19 @@ fn tool_hint(key: &str, label: &str, s: &Span) -> Option<String> {
         "docker" if label.starts_with("docker build") || label.starts_with("docker buildx") => {
             Some("The build runs inside the Docker daemon, so whyslow only sees the client waiting. Check layer caching: copy dependency manifests and install them before copying the source.".into())
         }
-        "cargo" | "rustc" => Some("`cargo build --timings` gives a per-crate breakdown of a Rust build.".into()),
+        "rustc" => {
+            let flags = s.argv.join(" ");
+            let one_unit = flags.contains("codegen-units=1");
+            let lto = s.argv.windows(2).any(|w| w[0] == "-C" && (w[1] == "lto" || w[1] == "lto=fat" || w[1] == "lto=true"))
+                || s.argv.iter().any(|a| a == "-Clto" || a == "-Clto=fat");
+            match (one_unit, lto) {
+                (true, true) => Some("This crate is built with `codegen-units=1` and fat LTO, which keeps it on a single core. Worth it for releases; for day-to-day builds use a profile without them.".into()),
+                (true, false) => Some("This crate is built with `codegen-units=1`, which keeps code generation on a single core.".into()),
+                (false, true) => Some("Fat LTO runs mostly on a single core; `lto = \"thin\"` is usually much faster for a similar result.".into()),
+                _ => Some("`cargo build --timings` gives a per-crate breakdown of a Rust build.".into()),
+            }
+        }
+        "cargo" => Some("`cargo build --timings` gives a per-crate breakdown of a Rust build.".into()),
         _ => None,
     }
 }
@@ -368,7 +380,15 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
         text.push(')');
         let cores = avg_cores(top);
         let idle = idle_total(a, g.top);
-        if top.dur() >= 1000.0 {
+        let top_self = a.self_ms[g.top as usize];
+        // With many runs, name the one that matters when it dominates.
+        let subject = if g.count > 1 && top_self >= g.self_ms * 0.5 {
+            text.push_str(&format!("; {} alone is {:.0}% ({})", code(lbl(g.top)), top_self / wall * 100.0, fmt_ms(top_self)));
+            true
+        } else {
+            g.count == 1
+        };
+        if subject && top.dur() >= 1000.0 {
             if idle >= top.dur() * 0.5 {
                 text.push_str(&format!(" and was idle for {} of it, waiting on the network, disk or another process", fmt_ms(idle)));
             } else if (0.75..=1.3).contains(&cores) && t.cpus > 1 {
