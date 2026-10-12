@@ -77,8 +77,21 @@ pub fn record(cmd: &[String], backend: Backend, quiet: bool) -> Result<Trace> {
     drop(io);
     let (output, output_dropped) = cap.finish();
 
-    let root = &outcome.spans[0];
-    let wall_ms = root.dur();
+    let mut outcome = outcome;
+    let mut output = output;
+    // Time zero is the moment the command started.
+    let origin = outcome.spans[0].start_ms;
+    for s in &mut outcome.spans {
+        s.start_ms -= origin;
+        s.end_ms -= origin;
+    }
+    for t in &mut outcome.ticks {
+        *t -= origin as f32;
+    }
+    for l in &mut output {
+        l.t_ms = (l.t_ms - origin).max(0.0);
+    }
+    let wall_ms = outcome.spans[0].dur();
     Ok(Trace {
         version: FORMAT_VERSION,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),

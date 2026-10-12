@@ -97,19 +97,33 @@ struct Tracer {
 impl Tracer {
     fn run(&mut self, root: i32, t0: Instant) -> (Option<i32>, Option<i32>) {
         let mut root_ready = false;
+        let mut root_status: Option<(Option<i32>, Option<i32>)> = None;
+        // Once the root is gone, give processes that are already dying a moment
+        // to finish, so `cmd & … kill $!` doesn't look like a daemon.
+        let mut grace_until: Option<Instant> = None;
         loop {
             if let Some(sig) = crate::signals::take_pending() {
                 unsafe { libc::kill(root, sig) };
             }
             let mut status = 0;
-            let pid = unsafe { libc::waitpid(-1, &mut status, libc::__WALL) };
+            let flags = if grace_until.is_some() { libc::__WALL | libc::WNOHANG } else { libc::__WALL };
+            let pid = unsafe { libc::waitpid(-1, &mut status, flags) };
+            if pid == 0 {
+                if self.procs.is_empty() || grace_until.is_some_and(|g| Instant::now() >= g) {
+                    return root_status.unwrap_or((None, None));
+                }
+                std::thread::sleep(Duration::from_millis(2));
+                continue;
+            }
             if pid == -1 {
                 if std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
                     continue;
                 }
                 // ECHILD: nothing left to wait for.
-                self.spans[0].end_ms = ms(t0);
-                return (None, None);
+                if root_status.is_none() {
+                    self.spans[0].end_ms = ms(t0);
+                }
+                return root_status.unwrap_or((None, None));
             }
             let now = ms(t0);
 
@@ -160,13 +174,18 @@ impl Tracer {
             }
             if let Some(id) = self.procs.remove(&pid) {
                 self.live.lock().unwrap().remove(&pid);
+                let root_end = root_status.map(|_| self.spans[0].end_ms);
                 let s = &mut self.spans[id as usize];
-                s.end_ms = now;
+                s.end_ms = root_end.map_or(now, |e| now.min(e).max(s.start_ms));
                 s.exit_code = code;
                 s.signal = sig;
             }
             if pid == root {
-                return (code, sig);
+                root_status = Some((code, sig));
+                if self.procs.is_empty() {
+                    return (code, sig);
+                }
+                grace_until = Some(Instant::now() + Duration::from_millis(150));
             }
         }
     }
