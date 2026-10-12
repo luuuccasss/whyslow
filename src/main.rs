@@ -95,7 +95,8 @@ fn main() {
     // `whyslow npm run build` is short for `whyslow run npm run build`.
     let mut args: Vec<OsString> = std::env::args_os().collect();
     let first = args.get(1).and_then(|a| a.to_str()).unwrap_or("");
-    if !first.is_empty() && !matches!(first, "run" | "show" | "compare" | "help" | "-h" | "--help" | "-V" | "--version") {
+    if !first.is_empty() && !matches!(first, "run" | "show" | "compare" | "help" | "-h" | "--help" | "-V" | "--version")
+    {
         args.insert(1, "run".into());
     }
     let cli = Cli::parse_from(args);

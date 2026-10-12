@@ -91,7 +91,9 @@ fn open_pty() -> io::Result<(OwnedFd, OwnedFd)> {
         let have_size = libc::ioctl(1, libc::TIOCGWINSZ, &mut ws) == 0;
         let (mut m, mut s) = (-1, -1);
         let winp: *mut libc::winsize = if have_size { &mut ws } else { std::ptr::null_mut() };
-        if libc::openpty(&mut m, &mut s, std::ptr::null_mut(), std::ptr::null_mut::<libc::termios>() as _, winp as _) != 0 {
+        if libc::openpty(&mut m, &mut s, std::ptr::null_mut(), std::ptr::null_mut::<libc::termios>() as _, winp as _)
+            != 0
+        {
             return Err(io::Error::last_os_error());
         }
         for fd in [m, s] {

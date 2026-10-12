@@ -291,14 +291,34 @@ fn idle_total(a: &Analysis, id: u32) -> f64 {
 }
 
 fn avg_cores(s: &Span) -> f64 {
-    if s.dur() <= 0.0 { 0.0 } else { s.cpu_ms() / s.dur() }
+    if s.dur() <= 0.0 {
+        0.0
+    } else {
+        s.cpu_ms() / s.dur()
+    }
 }
 
 fn is_install(label: &str) -> bool {
     const P: &[&str] = &[
-        "npm install", "npm ci", "npm i", "yarn install", "pnpm install", "pnpm i", "bun install", "pip install",
-        "pip3 install", "poetry install", "uv sync", "uv pip", "bundle install", "composer install", "cargo fetch",
-        "go mod", "mvn dependency", "apt-get install", "apt install",
+        "npm install",
+        "npm ci",
+        "npm i",
+        "yarn install",
+        "pnpm install",
+        "pnpm i",
+        "bun install",
+        "pip install",
+        "pip3 install",
+        "poetry install",
+        "uv sync",
+        "uv pip",
+        "bundle install",
+        "composer install",
+        "cargo fetch",
+        "go mod",
+        "mvn dependency",
+        "apt-get install",
+        "apt install",
     ];
     label == "yarn" || P.iter().any(|p| label == *p || label.starts_with(&format!("{p} ")))
 }
@@ -373,7 +393,8 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
     if let Some(g) = a.groups.first().filter(|g| g.self_ms / wall >= 0.3 && wall >= 500.0) {
         let top = &spans[g.top as usize];
         let name = if g.count == 1 { lbl(g.top).to_string() } else { g.key.clone() };
-        let mut text = format!("{} accounts for {:.0}% of the time ({}", code(&name), g.self_ms / wall * 100.0, fmt_ms(g.self_ms));
+        let mut text =
+            format!("{} accounts for {:.0}% of the time ({}", code(&name), g.self_ms / wall * 100.0, fmt_ms(g.self_ms));
         if g.count > 1 {
             text.push_str(&format!(" over {} runs", g.count));
         }
@@ -383,14 +404,22 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
         let top_self = a.self_ms[g.top as usize];
         // With many runs, name the one that matters when it dominates.
         let subject = if g.count > 1 && top_self >= g.self_ms * 0.5 {
-            text.push_str(&format!("; {} alone is {:.0}% ({})", code(lbl(g.top)), top_self / wall * 100.0, fmt_ms(top_self)));
+            text.push_str(&format!(
+                "; {} alone is {:.0}% ({})",
+                code(lbl(g.top)),
+                top_self / wall * 100.0,
+                fmt_ms(top_self)
+            ));
             true
         } else {
             g.count == 1
         };
         if subject && top.dur() >= 1000.0 {
             if idle >= top.dur() * 0.5 {
-                text.push_str(&format!(" and was idle for {} of it, waiting on the network, disk or another process", fmt_ms(idle)));
+                text.push_str(&format!(
+                    " and was idle for {} of it, waiting on the network, disk or another process",
+                    fmt_ms(idle)
+                ));
             } else if (0.75..=1.3).contains(&cores) && t.cpus > 1 {
                 text.push_str(", busy on a single core");
             } else if cores > 1.5 {
@@ -413,11 +442,8 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
         let sig = (wall * 0.05).max(1000.0);
         let mut best: Option<(f64, Vec<u32>, u32)> = None;
         for (p, kids) in a.children.iter().enumerate() {
-            let big: Vec<u32> = kids
-                .iter()
-                .copied()
-                .filter(|&k| spans[k as usize].dur() >= sig && !is_install(lbl(k)))
-                .collect();
+            let big: Vec<u32> =
+                kids.iter().copied().filter(|&k| spans[k as usize].dur() >= sig && !is_install(lbl(k))).collect();
             let mut chain: Vec<u32> = Vec::new();
             let mut flush = |chain: &mut Vec<u32>| {
                 if chain.len() >= 2 {
@@ -488,7 +514,9 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
         .into_values()
         .filter(|ids| ids.len() >= 2 && ids.len() < 50)
         .map(|ids| (ids.iter().map(|&i| spans[i as usize].dur()).sum::<f64>(), ids))
-        .filter(|(total, ids)| *total >= (wall * 0.05).max(1000.0) && ids.iter().all(|&i| spans[i as usize].dur() >= 200.0))
+        .filter(|(total, ids)| {
+            *total >= (wall * 0.05).max(1000.0) && ids.iter().all(|&i| spans[i as usize].dur() >= 200.0)
+        })
         .collect();
     repeated.sort_by(|a, b| b.0.total_cmp(&a.0));
     for (total, ids) in repeated.into_iter().take(2) {
@@ -501,7 +529,9 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
                 ids.len(),
                 fmt_ms(total)
             ),
-            hint: Some("Check for a step that runs both from a hook (pre/post scripts) and from the main script.".into()),
+            hint: Some(
+                "Check for a step that runs both from a hook (pre/post scripts) and from the main script.".into(),
+            ),
             impact_ms: total * (ids.len() - 1) as f64 / ids.len() as f64,
             spans: ids,
         });
@@ -578,17 +608,21 @@ fn insights(t: &Trace, a: &Analysis) -> Vec<Insight> {
             // Who was busy: most overlap, preferring the deepest process.
             let overlap = |s: &Span| (s.end_ms.min(g1) - s.start_ms.max(g0)).max(0.0);
             let best = spans.iter().map(overlap).fold(0.0, f64::max);
-            let who = spans
-                .iter()
-                .filter(|s| overlap(s) >= best * 0.8 && best > 0.0)
-                .max_by_key(|s| a.depth[s.id as usize]);
+            let who =
+                spans.iter().filter(|s| overlap(s) >= best * 0.8 && best > 0.0).max_by_key(|s| a.depth[s.id as usize]);
             let mut text = format!("No output for {} (from {} to {})", fmt_ms(gap), fmt_ms(g0), fmt_ms(g1));
             if let Some(w) = who {
                 text.push_str(&format!(" while {} was running", code(lbl(w.id))));
             }
             text.push('.');
             let hint = (at > 0).then(|| format!("Last line before it: \"{}\"", truncate(&t.output[at - 1].text, 80)));
-            out.push(Insight { level: Level::Info, text, hint, spans: who.map(|w| vec![w.id]).unwrap_or_default(), impact_ms: 0.0 });
+            out.push(Insight {
+                level: Level::Info,
+                text,
+                hint,
+                spans: who.map(|w| vec![w.id]).unwrap_or_default(),
+                impact_ms: 0.0,
+            });
         }
     }
 

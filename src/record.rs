@@ -25,6 +25,7 @@ pub struct Outcome {
 
 pub enum BackendError {
     /// ptrace is not permitted here (seccomp, Yama, nested tracer…).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Denied(std::io::Error),
     Other(anyhow::Error),
 }

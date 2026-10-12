@@ -13,20 +13,95 @@ pub struct Label {
 }
 
 const SUBCOMMAND_TOOLS: &[&str] = &[
-    "git", "cargo", "go", "docker", "podman", "npm", "npx", "yarn", "pnpm", "bun", "deno", "make", "gmake",
-    "gradle", "gradlew", "mvn", "dotnet", "kubectl", "pip", "pip3", "poetry", "uv", "terraform", "rustup",
-    "composer", "bundle", "rake", "mix", "swift", "zig", "nx", "turbo", "vite", "next", "nuxt", "ng", "astro",
-    "vitest", "pytest", "lerna", "corepack", "brew", "apt", "apt-get", "helm", "ninja", "cmake", "meson", "bazel",
+    "git",
+    "cargo",
+    "go",
+    "docker",
+    "podman",
+    "npm",
+    "npx",
+    "yarn",
+    "pnpm",
+    "bun",
+    "deno",
+    "make",
+    "gmake",
+    "gradle",
+    "gradlew",
+    "mvn",
+    "dotnet",
+    "kubectl",
+    "pip",
+    "pip3",
+    "poetry",
+    "uv",
+    "terraform",
+    "rustup",
+    "composer",
+    "bundle",
+    "rake",
+    "mix",
+    "swift",
+    "zig",
+    "nx",
+    "turbo",
+    "vite",
+    "next",
+    "nuxt",
+    "ng",
+    "astro",
+    "vitest",
+    "pytest",
+    "lerna",
+    "corepack",
+    "brew",
+    "apt",
+    "apt-get",
+    "helm",
+    "ninja",
+    "cmake",
+    "meson",
+    "bazel",
 ];
 const SHELLS: &[&str] = &["sh", "bash", "dash", "zsh", "ash", "ksh", "fish"];
 const WRAPPERS: &[&str] = &["env", "nice", "nohup", "time", "stdbuf", "ionice", "chrt", "setsid", "caffeinate"];
-const COMPILERS: &[&str] = &["cc", "c++", "gcc", "g++", "clang", "clang++", "cc1", "cc1plus", "cc1obj", "as", "javac", "swiftc"];
+const COMPILERS: &[&str] =
+    &["cc", "c++", "gcc", "g++", "clang", "clang++", "cc1", "cc1plus", "cc1obj", "as", "javac", "swiftc"];
 const SOURCE_EXT: &[&str] = &[".c", ".cc", ".cpp", ".cxx", ".c++", ".m", ".mm", ".s", ".S", ".java", ".swift"];
 /// Flags that take the following argument as their value.
 const VALUE_FLAGS: &[&str] = &[
-    "-C", "-f", "-o", "-p", "-c", "--project", "--config", "--filter", "-F", "-w", "--workspace", "-r", "--require",
-    "--import", "--loader", "--experimental-loader", "--cwd", "--prefix", "-I", "-L", "-W", "-X", "--manifest-path",
-    "-j", "--jobs", "--target", "-t", "-e", "--env", "--title", "--inspect-port", "--mode",
+    "-C",
+    "-f",
+    "-o",
+    "-p",
+    "-c",
+    "--project",
+    "--config",
+    "--filter",
+    "-F",
+    "-w",
+    "--workspace",
+    "-r",
+    "--require",
+    "--import",
+    "--loader",
+    "--experimental-loader",
+    "--cwd",
+    "--prefix",
+    "-I",
+    "-L",
+    "-W",
+    "-X",
+    "--manifest-path",
+    "-j",
+    "--jobs",
+    "--target",
+    "-t",
+    "-e",
+    "--env",
+    "--title",
+    "--inspect-port",
+    "--mode",
 ];
 const GENERIC_STEMS: &[&str] = &["cli", "index", "main", "bin", "run", "start", "entry", "launcher", "app", "program"];
 
@@ -243,8 +318,14 @@ fn label_depth(argv: &[String], depth: u8) -> Label {
         }
         return simple("rustc".into(), "rustc");
     }
-    if COMPILERS.contains(&base) || base.starts_with("gcc-") || base.starts_with("clang-") || base.ends_with("-gcc") || base.ends_with("-g++") {
-        if let Some(src) = rest.iter().rev().find(|a| !a.starts_with('-') && SOURCE_EXT.iter().any(|e| a.ends_with(e))) {
+    if COMPILERS.contains(&base)
+        || base.starts_with("gcc-")
+        || base.starts_with("clang-")
+        || base.ends_with("-gcc")
+        || base.ends_with("-g++")
+    {
+        if let Some(src) = rest.iter().rev().find(|a| !a.starts_with('-') && SOURCE_EXT.iter().any(|e| a.ends_with(e)))
+        {
             return simple(format!("{base} {}", basename(src)), base);
         }
         if rest.iter().any(|a| a == "-o") && !rest.iter().any(|a| a == "-c" || a == "-S" || a == "-E") {

@@ -13,7 +13,11 @@ pub struct Style {
 
 impl Style {
     fn wrap(&self, code: &str, s: &str) -> String {
-        if self.color { format!("\x1b[{code}m{s}\x1b[0m") } else { s.to_string() }
+        if self.color {
+            format!("\x1b[{code}m{s}\x1b[0m")
+        } else {
+            s.to_string()
+        }
     }
     pub fn bold(&self, s: &str) -> String {
         self.wrap("1", s)
@@ -40,7 +44,11 @@ impl Style {
         }
         let mut out = String::new();
         for (i, part) in s.split('`').enumerate() {
-            if i % 2 == 1 { out.push_str(&self.bold(part)) } else { out.push_str(part) }
+            if i % 2 == 1 {
+                out.push_str(&self.bold(part))
+            } else {
+                out.push_str(part)
+            }
         }
         out
     }
@@ -52,12 +60,20 @@ fn visible_len(s: &str) -> usize {
 
 fn pad(s: &str, w: usize) -> String {
     let l = visible_len(s);
-    if l >= w { s.to_string() } else { format!("{s}{}", " ".repeat(w - l)) }
+    if l >= w {
+        s.to_string()
+    } else {
+        format!("{s}{}", " ".repeat(w - l))
+    }
 }
 
 fn lpad(s: &str, w: usize) -> String {
     let l = visible_len(s);
-    if l >= w { s.to_string() } else { format!("{}{s}", " ".repeat(w - l)) }
+    if l >= w {
+        s.to_string()
+    } else {
+        format!("{}{s}", " ".repeat(w - l))
+    }
 }
 
 /// Greedy word wrap of plain text containing `code` marks.
@@ -220,7 +236,9 @@ pub fn render(t: &Trace, a: &Analysis, st: &Style, width: usize, max_rows: usize
     while tick <= wall + 1e-6 {
         let c = ((tick / wall) * cols as f64).round() as usize;
         let lab = axis_label(tick, step);
-        if c + lab.len() <= axis.len() && axis[c.saturating_sub(1)..(c + lab.len()).min(axis.len())].iter().all(|&x| x == ' ') {
+        if c + lab.len() <= axis.len()
+            && axis[c.saturating_sub(1)..(c + lab.len()).min(axis.len())].iter().all(|&x| x == ' ')
+        {
             for (i, ch) in lab.chars().enumerate() {
                 axis[c + i] = ch;
             }
@@ -281,7 +299,16 @@ pub fn render(t: &Trace, a: &Analysis, st: &Style, width: usize, max_rows: usize
     let _ = writeln!(
         o,
         "  {}",
-        st.dim(&format!("{}  {:>8}  {:>5}  {:<20}  {:>6}  {:>8}  {:>8}", pad("tool", key_w), "time", "share", "", "runs", "cpu", "peak mem"))
+        st.dim(&format!(
+            "{}  {:>8}  {:>5}  {:<20}  {:>6}  {:>8}  {:>8}",
+            pad("tool", key_w),
+            "time",
+            "share",
+            "",
+            "runs",
+            "cpu",
+            "peak mem"
+        ))
     );
     let shown: Vec<_> = a.groups.iter().filter(|g| g.self_ms >= wall * 0.005).take(8).collect();
     for g in &shown {
@@ -303,7 +330,16 @@ pub fn render(t: &Trace, a: &Analysis, st: &Style, width: usize, max_rows: usize
     let rest: f64 = a.groups.iter().skip(shown.len()).map(|g| g.self_ms).sum();
     let rest_n = a.groups.len() - shown.len();
     if rest_n > 0 {
-        let _ = writeln!(o, "  {}", st.dim(&format!("{}  {:>8}  {:>4.0}%  ({rest_n} more)", pad("other", key_w), fmt_ms(rest), rest / wall * 100.0)));
+        let _ = writeln!(
+            o,
+            "  {}",
+            st.dim(&format!(
+                "{}  {:>8}  {:>4.0}%  ({rest_n} more)",
+                pad("other", key_w),
+                fmt_ms(rest),
+                rest / wall * 100.0
+            ))
+        );
     }
     let _ = writeln!(o);
 

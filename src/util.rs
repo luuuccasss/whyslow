@@ -97,8 +97,7 @@ pub fn strip_ansi(s: &str) -> String {
 pub fn shell_join(argv: &[String]) -> String {
     argv.iter()
         .map(|a| {
-            let plain = !a.is_empty()
-                && a.chars().all(|c| c.is_ascii_alphanumeric() || "-_./:=@%+,".contains(c));
+            let plain = !a.is_empty() && a.chars().all(|c| c.is_ascii_alphanumeric() || "-_./:=@%+,".contains(c));
             if plain {
                 a.clone()
             } else {

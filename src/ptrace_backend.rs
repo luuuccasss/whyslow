@@ -206,7 +206,8 @@ impl Tracer {
                         return;
                     }
                 }
-                let owner = if self.procs.contains_key(&pid) { pid } else { self.threads.get(&pid).copied().unwrap_or(pid) };
+                let owner =
+                    if self.procs.contains_key(&pid) { pid } else { self.threads.get(&pid).copied().unwrap_or(pid) };
                 let parent = self.procs.get(&owner).copied();
                 let id = self.spans.len() as u32;
                 let mut s = match parent {
@@ -283,10 +284,7 @@ fn tgid_of(tid: i32) -> Option<i32> {
 
 fn read_cmdline(pid: i32) -> Option<Vec<String>> {
     let raw = std::fs::read(format!("/proc/{pid}/cmdline")).ok()?;
-    let argv: Vec<String> = raw
-        .split(|&b| b == 0)
-        .map(|a| String::from_utf8_lossy(a).into_owned())
-        .collect::<Vec<_>>();
+    let argv: Vec<String> = raw.split(|&b| b == 0).map(|a| String::from_utf8_lossy(a).into_owned()).collect::<Vec<_>>();
     let mut argv = argv;
     while argv.last().is_some_and(|a| a.is_empty()) {
         argv.pop();
@@ -296,7 +294,11 @@ fn read_cmdline(pid: i32) -> Option<Vec<String>> {
 
 fn clk_tck() -> f64 {
     let t = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
-    if t > 0 { t as f64 } else { 100.0 }
+    if t > 0 {
+        t as f64
+    } else {
+        100.0
+    }
 }
 
 /// utime + stime of the whole process, in clock ticks.

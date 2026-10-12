@@ -62,7 +62,11 @@ pub fn render(bt: &Trace, ba: &Analysis, at: &Trace, aa: &Analysis, st: &Style, 
         .collect();
     rows.sort_by(|x, y| (y.2 - y.1).abs().total_cmp(&(x.2 - x.1).abs()));
     let key_w = rows.iter().map(|r| r.0.chars().count()).max().unwrap_or(8).clamp(8, 28);
-    let _ = writeln!(o, "  {}", st.dim(&format!("{:<key_w$}  {:>9}  {:>9}  {:>9}  {:>6}  runs", "tool", "before", "after", "delta", "")));
+    let _ = writeln!(
+        o,
+        "  {}",
+        st.dim(&format!("{:<key_w$}  {:>9}  {:>9}  {:>9}  {:>6}  runs", "tool", "before", "after", "delta", ""))
+    );
     for (k, b, a, bn, an) in rows.into_iter().take(15) {
         let d = a - b;
         let runs = if bn == an { format!("×{an}") } else { format!("×{bn} → ×{an}") };
@@ -73,7 +77,13 @@ pub fn render(bt: &Trace, ba: &Analysis, at: &Trace, aa: &Analysis, st: &Style, 
             if bn > 0 { fmt_ms(b) } else { "-".into() },
             if an > 0 { fmt_ms(a) } else { "-".into() },
             paint(d, format!("{:>9}", fmt_delta(d)), base),
-            if bn > 0 && an > 0 { pct(b, a) } else if an == 0 { "gone".into() } else { "new".into() },
+            if bn > 0 && an > 0 {
+                pct(b, a)
+            } else if an == 0 {
+                "gone".into()
+            } else {
+                "new".into()
+            },
             st.dim(&runs)
         );
     }
