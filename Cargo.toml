@@ -1,0 +1,24 @@
+[package]
+name = "whyslow"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Run any command and see where the time went: process timeline, CPU, idle time and concrete hints."
+license = "MIT"
+repository = "https://github.com/luuuccasss/whyslow"
+readme = "README.md"
+keywords = ["profiling", "build", "performance", "cli", "timeline"]
+categories = ["command-line-utilities", "development-tools::profiling"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
