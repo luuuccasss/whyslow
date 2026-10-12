@@ -36,5 +36,5 @@ jobs:
         with:
           bin: whyslow
           target: ${{ matrix.target }}
-          archive: whyslow-$tag-$target
+          archive: whyslow-$target
           token: ${{ secrets.GITHUB_TOKEN }}
