@@ -116,7 +116,7 @@ fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
 
 fn reader(fd: OwnedFd, sink: Sink, err: bool, t0: Instant, store: Arc<Mutex<Store>>, stop: Arc<AtomicBool>) {
     let raw = fd.as_raw_fd();
-    let mut split = Splitter { buf: Vec::new(), start: None, err };
+    let mut split = Splitter { buf: Vec::new(), start: None, err, cr: false, esc: 0 };
     let mut buf = vec![0u8; 64 * 1024];
     let mut stop_seen: Option<Instant> = None;
     loop {
@@ -172,35 +172,77 @@ struct Splitter {
     buf: Vec<u8>,
     start: Option<f64>,
     err: bool,
+    /// A carriage return was seen: the next byte redraws the line.
+    cr: bool,
+    /// Inside an escape sequence (0 = no, 1 = after ESC, 2 = in CSI).
+    esc: u8,
 }
 
 impl Splitter {
     fn feed(&mut self, data: &[u8], now: f64, store: &Mutex<Store>) {
         for &b in data {
-            if self.start.is_none() {
+            if b == b'\n' {
+                self.cr = false;
+                self.emit(store);
+                continue;
+            }
+            if b == b'\r' {
+                self.cr = true;
+                continue;
+            }
+            if self.cr {
+                // Progress bars and spinners redraw the line: keep the last
+                // version, timestamped when it was drawn.
+                self.cr = false;
+                self.buf.clear();
+                self.start = None;
+            }
+            // The line's time is when its first visible character was written,
+            // not when a "clear line" escape sequence was.
+            let visible = match (self.esc, b) {
+                (_, 0x1b) => {
+                    self.esc = 1;
+                    false
+                }
+                (1, b'[') => {
+                    self.esc = 2;
+                    false
+                }
+                (1, _) => {
+                    self.esc = 0;
+                    false
+                }
+                (2, 0x40..=0x7e) => {
+                    self.esc = 0;
+                    false
+                }
+                (2, _) => false,
+                _ => b >= 0x20 || b == b'\t',
+            };
+            if visible && self.start.is_none() {
                 self.start = Some(now);
             }
-            if b == b'\n' {
+            self.buf.push(b);
+            // ESC[G / ESC[1G (cursor to column 1) is a carriage return too.
+            if b == b'G' && (self.buf.ends_with(b"\x1b[1G") || self.buf.ends_with(b"\x1b[G")) {
+                self.buf.clear();
+                self.start = None;
+            }
+            if self.buf.len() > 256 * 1024 {
                 self.emit(store);
-            } else {
-                self.buf.push(b);
-                if self.buf.len() > 256 * 1024 {
-                    self.emit(store);
-                }
             }
         }
     }
 
     fn emit(&mut self, store: &Mutex<Store>) {
         let t = self.start.take().unwrap_or(0.0);
+        self.cr = false;
         if self.buf.is_empty() {
             return;
         }
         let raw = String::from_utf8_lossy(&self.buf).into_owned();
         self.buf.clear();
-        // Progress bars redraw with \r: keep what was visible last.
-        let visible = raw.trim_end_matches('\r').rsplit('\r').next().unwrap_or("");
-        let text = strip_ansi(visible);
+        let text = strip_ansi(&raw);
         let text = text.trim_end();
         if text.trim().is_empty() {
             return;
@@ -211,5 +253,24 @@ impl Splitter {
             return;
         }
         s.lines.push(OutputLine { t_ms: t, text: truncate(text, MAX_LINE_CHARS), err: self.err });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redraws_keep_the_last_version_and_its_time() {
+        let store = Mutex::new(Store::default());
+        let mut sp = Splitter { buf: Vec::new(), start: None, err: false, cr: false, esc: 0 };
+        sp.feed(b"\x1b[1G\x1b[0K\xe2\xa0\x99", 1.0, &store);
+        sp.feed(b"\x1b[1G\x1b[0K\nadded 27 packages\r\n", 9.0, &store);
+        sp.feed(b"50%\r100%\n", 12.0, &store);
+        sp.feed(b"\x1b[1G\x1b[0K", 13.0, &store);
+        sp.feed(b"\x1b[36mvite\x1b[39m\n", 20.0, &store);
+        let s = store.lock().unwrap();
+        let got: Vec<(f64, &str)> = s.lines.iter().map(|l| (l.t_ms, l.text.as_str())).collect();
+        assert_eq!(got, vec![(9.0, "added 27 packages"), (12.0, "100%"), (20.0, "vite")]);
     }
 }
